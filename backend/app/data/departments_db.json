@@ -1,0 +1,42 @@
+{
+  "last_updated": "2026-02-14T00:00:00",
+  "departments": {
+    "Cardiology": {
+      "wards": [
+        { "name": "CCU", "total": 12, "occupied": 9, "available": 3 },
+        { "name": "Ward A", "total": 16, "occupied": 10, "available": 6 },
+        { "name": "Ward B", "total": 12, "occupied": 8, "available": 4 }
+      ],
+      "admission_logs": []
+    },
+    "Neurology": {
+      "wards": [
+        { "name": "Neuro ICU", "total": 8, "occupied": 7, "available": 1 },
+        { "name": "Ward C", "total": 14, "occupied": 8, "available": 6 }
+      ],
+      "admission_logs": []
+    },
+    "General Medicine": {
+      "wards": [
+        { "name": "Ward D", "total": 20, "occupied": 14, "available": 6 },
+        { "name": "Ward E", "total": 20, "occupied": 16, "available": 4 },
+        { "name": "Ward F", "total": 20, "occupied": 12, "available": 8 }
+      ],
+      "admission_logs": []
+    },
+    "Emergency": {
+      "wards": [
+        { "name": "ER Bay", "total": 15, "occupied": 13, "available": 2 },
+        { "name": "Observation", "total": 10, "occupied": 7, "available": 3 }
+      ],
+      "admission_logs": []
+    },
+    "Gynecology": {
+      "wards": [
+        { "name": "Ward G", "total": 10, "occupied": 5, "available": 5 },
+        { "name": "Ward H", "total": 10, "occupied": 7, "available": 3 }
+      ],
+      "admission_logs": []
+    }
+  }
+}

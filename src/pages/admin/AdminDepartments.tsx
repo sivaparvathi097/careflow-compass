@@ -1,44 +1,24 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Plus, Minus, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type DeptName = "Cardiology" | "Neurology" | "General Medicine" | "Emergency" | "Gynecology";
-
-interface Ward {
-  name: string;
-  totalBeds: number;
-  occupied: number;
-}
-
-const DEPARTMENTS: Record<DeptName, Ward[]> = {
-  Cardiology: [
-    { name: "CCU", totalBeds: 12, occupied: 9 },
-    { name: "Ward A", totalBeds: 16, occupied: 10 },
-    { name: "Ward B", totalBeds: 12, occupied: 8 },
-  ],
-  Neurology: [
-    { name: "Neuro ICU", totalBeds: 8, occupied: 7 },
-    { name: "Ward C", totalBeds: 14, occupied: 8 },
-  ],
-  "General Medicine": [
-    { name: "Ward D", totalBeds: 20, occupied: 14 },
-    { name: "Ward E", totalBeds: 20, occupied: 16 },
-    { name: "Ward F", totalBeds: 20, occupied: 12 },
-  ],
-  Emergency: [
-    { name: "ER Bay", totalBeds: 15, occupied: 13 },
-    { name: "Observation", totalBeds: 10, occupied: 7 },
-  ],
-  Gynecology: [
-    { name: "Ward G", totalBeds: 10, occupied: 5 },
-    { name: "Ward H", totalBeds: 10, occupied: 7 },
-  ],
-};
+import { usePatients, Department } from "@/contexts/PatientContext";
 
 const AdminDepartments = () => {
-  const [selected, setSelected] = useState<DeptName>("Cardiology");
-  const wards = DEPARTMENTS[selected];
+  const [selected, setSelected] = useState<Department>("Cardiology");
+  const { departments, incrementOccupied, decrementOccupied, getForecastHours } = usePatients();
+  
+  const wards = departments[selected];
+
+  const handleIncrement = (wardName: string) => {
+    incrementOccupied(selected, wardName);
+  };
+
+  const handleDecrement = (wardName: string) => {
+    decrementOccupied(selected, wardName);
+  };
 
   return (
     <div className="space-y-6">
@@ -48,7 +28,7 @@ const AdminDepartments = () => {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(Object.keys(DEPARTMENTS) as DeptName[]).map(dept => (
+        {(Object.keys(departments) as Department[]).map(dept => (
           <button
             key={dept}
             onClick={() => setSelected(dept)}
@@ -73,11 +53,39 @@ const AdminDepartments = () => {
                 <TableHead>Occupied</TableHead>
                 <TableHead>Available</TableHead>
                 <TableHead>Occupancy %</TableHead>
+                <TableHead>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    Forecast
+                  </span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {wards.map(w => {
                 const occ = Math.round((w.occupied / w.totalBeds) * 100);
+                const forecast = getForecastHours(selected, w.name, w);
+                
+                // Format forecast display
+                let forecastText: string;
+                let forecastColor: string;
+                if (forecast === 0) {
+                  forecastText = "Full";
+                  forecastColor = "text-destructive";
+                } else if (forecast === null) {
+                  forecastText = "No data";
+                  forecastColor = "text-muted-foreground";
+                } else if (forecast <= 2) {
+                  forecastText = `~${forecast} hrs`;
+                  forecastColor = "text-destructive";
+                } else if (forecast <= 6) {
+                  forecastText = `~${forecast} hrs`;
+                  forecastColor = "text-warning";
+                } else {
+                  forecastText = `~${forecast} hrs`;
+                  forecastColor = "text-success";
+                }
+                
                 return (
                   <TableRow key={w.name}>
                     <TableCell className="font-medium">{w.name}</TableCell>
@@ -87,6 +95,11 @@ const AdminDepartments = () => {
                     <TableCell>
                       <span className={cn("font-semibold", occ > 85 ? "text-destructive" : occ > 60 ? "text-warning" : "text-success")}>
                         {occ}%
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className={cn("font-semibold", forecastColor)}>
+                        {forecastText}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -101,14 +114,41 @@ const AdminDepartments = () => {
         <CardHeader><CardTitle>Bed Grid — {selected}</CardTitle></CardHeader>
         <CardContent>
           {wards.map(w => (
-            <div key={w.name} className="mb-4">
-              <p className="text-sm font-medium mb-2">{w.name}</p>
+            <div key={w.name} className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">{w.name}</p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7 rounded-full border-red-300 hover:bg-red-50 hover:border-red-400"
+                    onClick={() => handleDecrement(w.name)}
+                    disabled={w.occupied === 0}
+                    title="Release bed (patient discharged)"
+                  >
+                    <Minus className="h-3.5 w-3.5 text-red-600" />
+                  </Button>
+                  <span className="text-xs font-medium w-16 text-center">
+                    {w.occupied}/{w.totalBeds}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7 rounded-full border-green-300 hover:bg-green-50 hover:border-green-400"
+                    onClick={() => handleIncrement(w.name)}
+                    disabled={w.occupied >= w.totalBeds}
+                    title="Occupy bed (patient admitted)"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-green-600" />
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {Array.from({ length: w.totalBeds }).map((_, i) => (
                   <div
                     key={i}
                     className={cn(
-                      "h-6 w-6 rounded-sm text-[10px] flex items-center justify-center font-medium",
+                      "h-6 w-6 rounded-sm text-[10px] flex items-center justify-center font-medium transition-colors",
                       i < w.occupied ? "bg-destructive/80 text-destructive-foreground" : "bg-success/80 text-success-foreground"
                     )}
                   >
