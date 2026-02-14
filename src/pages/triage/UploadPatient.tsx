@@ -27,32 +27,54 @@ const UploadPatient = () => {
 
   const handleChange = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const riskScore = Math.floor(Math.random() * 80) + 15;
-    const riskLevel = riskScore >= 70 ? "High" : riskScore >= 40 ? "Medium" : "Low";
-    const dept = DEPARTMENTS[Math.floor(Math.random() * DEPARTMENTS.length)];
-    const patient = {
-      id: form.patientId || `MAN-${Date.now()}`,
+    const payload = {
+      name: form.patientId || "Unknown",
       age: parseInt(form.age) || 30,
       gender: form.gender,
-      symptoms: form.symptoms,
-      bloodPressure: form.bloodPressure || "120/80",
+      chiefComplaint: form.symptoms,
       heartRate: parseInt(form.heartRate) || 75,
+      bloodPressure: form.bloodPressure || "120/80",
       temperature: parseFloat(form.temperature) || 37.0,
-      preExistingConditions: form.preExistingConditions || "None",
-      arrivalTime: new Date().toLocaleTimeString(),
-      riskScore,
-      riskLevel: riskLevel as any,
-      department: dept,
-      contributingFactors: ["Manual entry", "Symptoms reported", "Vitals recorded"],
-      reasonSummary: `Patient manually entered with symptoms: ${form.symptoms}`,
-      confidenceScore: Math.floor(Math.random() * 20) + 75,
-      synthetic: false,
+      respiratoryRate: 16,
+      oxygenSaturation: 98,
+      medicalHistory: form.preExistingConditions ? form.preExistingConditions.split(",").map(s => s.trim()) : [],
+      currentMedications: [],
     };
-    addPatient(patient);
-    selectPatient(patient);
-    navigate("/triage/analysis");
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      const p = data.patient || data;
+      const patient = {
+        id: p.patientId,
+        age: p.age,
+        gender: p.gender,
+        symptoms: Array.isArray(p.symptoms) ? p.symptoms.join(", ") : p.symptoms || form.symptoms,
+        bloodPressure: p.bloodPressure,
+        heartRate: p.heartRate,
+        temperature: p.temperature,
+        preExistingConditions: Array.isArray(p.preExistingConditions) ? p.preExistingConditions.join(", ") : p.preExistingConditions || form.preExistingConditions || "None",
+        arrivalTime: new Date().toLocaleTimeString(),
+        riskScore: Math.round((data.riskScore || 0) * 100),
+        riskLevel: data.riskLevel as any,
+        department: data.department,
+        contributingFactors: data.contributingFactors || [],
+        reasonSummary: data.reasonSummary || "",
+        confidenceScore: Math.round((data.confidenceScore || 0) * 100),
+        synthetic: false,
+      };
+      addPatient(patient);
+      selectPatient(patient);
+      navigate("/triage/analysis");
+    } catch (err) {
+      console.error("Failed to create patient:", err);
+      alert("Failed to create patient. Please try again.");
+    }
   };
 
   return (

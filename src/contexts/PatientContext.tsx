@@ -84,20 +84,68 @@ export function generateSyntheticPatient(index: number): Patient {
 
 export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const counterRef = useRef(1);
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    const initial: Patient[] = [];
-    for (let i = 0; i < 5; i++) {
-      initial.push(generateSyntheticPatient(counterRef.current++));
-    }
-    return initial;
-  });
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPatients(prev => [...prev, generateSyntheticPatient(counterRef.current++)]);
-    }, 5000);
-    return () => clearInterval(interval);
+    fetch("http://127.0.0.1:8000/api/patients")
+      .then(res => res.json())
+      .then(data => {
+        const mapped = (data.patients || []).map((p: any) => ({
+          id: p.patientId,
+          age: p.age,
+          gender: p.gender,
+          symptoms: Array.isArray(p.symptoms) ? p.symptoms.join(", ") : p.symptoms || "",
+          bloodPressure: p.bloodPressure,
+          heartRate: p.heartRate,
+          temperature: p.temperature,
+          preExistingConditions: Array.isArray(p.preExistingConditions) ? p.preExistingConditions.join(", ") : p.preExistingConditions || "None",
+          arrivalTime: new Date().toLocaleTimeString(),
+          riskScore: Math.round((p.riskScore || 0) * 100),
+          riskLevel: p.riskLevel,
+          department: p.department,
+          contributingFactors: p.contributingFactors || [],
+          reasonSummary: p.reasonSummary || "",
+          confidenceScore: Math.round((p.confidenceScore || 0) * 100),
+          synthetic: false,
+        }));
+        setPatients(mapped);
+      })
+      .catch(err => console.error("Failed to fetch patients:", err));
+  }, []);
+
+  useEffect(() => {
+    const eventSource = new EventSource("http://127.0.0.1:8000/api/patients/realtime");
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.event === "patient_created" && data.patient) {
+          const p = data.patient;
+          const newPatient: Patient = {
+            id: p.patientId,
+            age: p.age,
+            gender: p.gender,
+            symptoms: Array.isArray(p.symptoms) ? p.symptoms.join(", ") : p.symptoms || "",
+            bloodPressure: p.bloodPressure,
+            heartRate: p.heartRate,
+            temperature: p.temperature,
+            preExistingConditions: Array.isArray(p.preExistingConditions) ? p.preExistingConditions.join(", ") : p.preExistingConditions || "None",
+            arrivalTime: new Date().toLocaleTimeString(),
+            riskScore: Math.round((p.riskScore || 0) * 100),
+            riskLevel: p.riskLevel,
+            department: p.department,
+            contributingFactors: p.contributingFactors || [],
+            reasonSummary: p.reasonSummary || "",
+            confidenceScore: Math.round((p.confidenceScore || 0) * 100),
+            synthetic: true,
+          };
+          setPatients(prev => [...prev, newPatient]);
+        }
+      } catch (err) {
+        console.error("Failed to parse SSE data:", err);
+      }
+    };
+    return () => eventSource.close();
   }, []);
 
   const addPatient = useCallback((p: Patient) => {
