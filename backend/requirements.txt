@@ -1,0 +1,6 @@
+- FastAPI
+- XGBoost
+- scikit-learn
+- Pandas
+- joblib
+- And supporting libraries
