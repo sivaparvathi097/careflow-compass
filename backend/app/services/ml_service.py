@@ -86,3 +86,31 @@ def predict_risk(patient_json):
         "risk_class_id": cid,
         "top_contributing_features": top_features
     }
+
+
+# Alias for patients.py compatibility
+def assess_risk(age, gender, symptoms, blood_pressure, heart_rate, temperature, pre_existing_conditions):
+    """Wrapper for predict_risk that accepts individual arguments."""
+    try:
+        systolic, diastolic = map(int, blood_pressure.split("/"))
+    except:
+        systolic, diastolic = 120, 80
+    
+    patient_json = {
+        "age": age,
+        "vitals": {
+            "systolic_bp": systolic,
+            "diastolic_bp": diastolic,
+            "heart_rate": heart_rate,
+            "temperature": temperature
+        }
+    }
+    
+    result = predict_risk(patient_json)
+    
+    # Convert to format expected by patients.py
+    return {
+        "riskScore": result["risk_score"],
+        "riskLevel": result["risk_level"],
+        "contributingFactors": [f["feature"] for f in result["top_contributing_features"]]
+    }

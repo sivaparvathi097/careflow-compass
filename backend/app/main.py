@@ -12,6 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers.departments import departments_router
 from app.routers.predictions import predictions_router
+from app.routers.patients import router as patients_router
+from app.routers.realtime import router as realtime_router
+from app.routers.upload import router as upload_router
+from app.routers.admin import router as admin_router
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -40,6 +44,10 @@ app.add_middleware(
 # Include routers
 app.include_router(departments_router)
 app.include_router(predictions_router)
+app.include_router(patients_router)
+app.include_router(realtime_router)
+app.include_router(upload_router)
+app.include_router(admin_router)
 
 
 @app.get("/")
@@ -54,6 +62,7 @@ async def root():
 
 
 @app.get("/api/health")
+@app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring."""
     return {"status": "healthy"}

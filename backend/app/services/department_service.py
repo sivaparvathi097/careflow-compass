@@ -261,3 +261,37 @@ class DepartmentService:
 
 # Singleton instance for application-wide use
 department_service = DepartmentService()
+
+
+# Standalone function for patients.py compatibility
+def assign_department(symptoms: str, heart_rate: int, blood_pressure: str, temperature: float) -> str:
+    """
+    Assign a department based on symptoms and vitals.
+    Simple rule-based assignment for demo purposes.
+    """
+    symptoms_lower = symptoms.lower()
+    
+    # Parse blood pressure
+    try:
+        systolic, _ = map(int, blood_pressure.split("/"))
+    except:
+        systolic = 120
+    
+    # Emergency conditions
+    if systolic > 180 or systolic < 90 or heart_rate > 130 or temperature > 39.5:
+        return "Emergency"
+    
+    # Cardiology
+    if any(s in symptoms_lower for s in ["chest pain", "palpitation", "heart"]):
+        return "Cardiology"
+    
+    # Neurology
+    if any(s in symptoms_lower for s in ["headache", "dizziness", "numbness", "seizure", "vision"]):
+        return "Neurology"
+    
+    # Gynecology
+    if any(s in symptoms_lower for s in ["pregnancy", "menstrual", "pelvic"]):
+        return "Gynecology"
+    
+    # Default
+    return "General Medicine"
