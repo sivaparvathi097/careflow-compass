@@ -22,11 +22,58 @@ export interface Patient {
   synthetic: boolean;
 }
 
+// Ward/Bed types for shared state
+export interface Ward {
+  name: string;
+  totalBeds: number;
+  occupied: number;
+}
+
+export type DepartmentsData = Record<Department, Ward[]>;
+export type AdmissionLogs = Record<string, number[]>; // "Dept:Ward" -> timestamps
+
+// localStorage keys
+const STORAGE_KEY_DEPTS = "careflow_departments_data";
+const STORAGE_KEY_LOGS = "careflow_admission_logs";
+
+// Initial data (used only if nothing in localStorage)
+const INITIAL_DEPARTMENTS: DepartmentsData = {
+  Cardiology: [
+    { name: "CCU", totalBeds: 12, occupied: 9 },
+    { name: "Ward A", totalBeds: 16, occupied: 10 },
+    { name: "Ward B", totalBeds: 12, occupied: 8 },
+  ],
+  Neurology: [
+    { name: "Neuro ICU", totalBeds: 8, occupied: 7 },
+    { name: "Ward C", totalBeds: 14, occupied: 8 },
+  ],
+  "General Medicine": [
+    { name: "Ward D", totalBeds: 20, occupied: 14 },
+    { name: "Ward E", totalBeds: 20, occupied: 16 },
+    { name: "Ward F", totalBeds: 20, occupied: 12 },
+  ],
+  Emergency: [
+    { name: "ER Bay", totalBeds: 15, occupied: 13 },
+    { name: "Observation", totalBeds: 10, occupied: 7 },
+  ],
+  Gynecology: [
+    { name: "Ward G", totalBeds: 10, occupied: 5 },
+    { name: "Ward H", totalBeds: 10, occupied: 7 },
+  ],
+};
+
 interface PatientContextType {
   patients: Patient[];
   selectedPatient: Patient | null;
   addPatient: (p: Patient) => void;
   selectPatient: (p: Patient) => void;
+  // Shared departments/beds state
+  departments: DepartmentsData;
+  admissionLogs: AdmissionLogs;
+  incrementOccupied: (dept: Department, wardName: string) => void;
+  decrementOccupied: (dept: Department, wardName: string) => void;
+  getDepartmentStats: (dept: Department) => { totalBeds: number; occupied: number; available: number };
+  getForecastHours: (dept: Department, wardName: string, ward: Ward) => number | null;
 }
 
 const PatientContext = createContext<PatientContextType | undefined>(undefined);
@@ -93,6 +140,34 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
+  // Load departments from localStorage or use initial data
+  const [departments, setDepartments] = useState<DepartmentsData>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DEPTS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return INITIAL_DEPARTMENTS;
+  });
+
+  // Load admission logs from localStorage
+  const [admissionLogs, setAdmissionLogs] = useState<AdmissionLogs>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_LOGS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return {};
+  });
+
+  // Persist departments to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_DEPTS, JSON.stringify(departments));
+  }, [departments]);
+
+  // Persist admission logs to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(admissionLogs));
+  }, [admissionLogs]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setPatients(prev => [...prev, generateSyntheticPatient(counterRef.current++)]);
@@ -108,8 +183,76 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSelectedPatient(p);
   }, []);
 
+  // Increment occupied bed count and log admission
+  const incrementOccupied = useCallback((dept: Department, wardName: string) => {
+    // Log admission timestamp
+    const key = `${dept}:${wardName}`;
+    setAdmissionLogs(prev => ({
+      ...prev,
+      [key]: [...(prev[key] || []), Date.now()]
+    }));
+
+    // Update occupied count
+    setDepartments(prev => {
+      const updatedWards = prev[dept].map(ward => {
+        if (ward.name === wardName && ward.occupied < ward.totalBeds) {
+          return { ...ward, occupied: ward.occupied + 1 };
+        }
+        return ward;
+      });
+      return { ...prev, [dept]: updatedWards };
+    });
+  }, []);
+
+  // Decrement occupied bed count
+  const decrementOccupied = useCallback((dept: Department, wardName: string) => {
+    setDepartments(prev => {
+      const updatedWards = prev[dept].map(ward => {
+        if (ward.name === wardName && ward.occupied > 0) {
+          return { ...ward, occupied: ward.occupied - 1 };
+        }
+        return ward;
+      });
+      return { ...prev, [dept]: updatedWards };
+    });
+  }, []);
+
+  // Get aggregated stats for a department
+  const getDepartmentStats = useCallback((dept: Department) => {
+    const wards = departments[dept] || [];
+    const totalBeds = wards.reduce((sum, w) => sum + w.totalBeds, 0);
+    const occupied = wards.reduce((sum, w) => sum + w.occupied, 0);
+    return { totalBeds, occupied, available: totalBeds - occupied };
+  }, [departments]);
+
+  // Calculate forecast hours for a ward
+  const getForecastHours = useCallback((dept: Department, wardName: string, ward: Ward): number | null => {
+    const remaining = ward.totalBeds - ward.occupied;
+    if (remaining <= 0) return 0;
+
+    const key = `${dept}:${wardName}`;
+    const logs = admissionLogs[key] || [];
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const recentAdmissions = logs.filter(t => t >= oneHourAgo);
+    const rate = recentAdmissions.length;
+
+    if (rate === 0) return null;
+    return Math.round((remaining / rate) * 10) / 10;
+  }, [admissionLogs]);
+
   return (
-    <PatientContext.Provider value={{ patients, selectedPatient, addPatient, selectPatient }}>
+    <PatientContext.Provider value={{
+      patients,
+      selectedPatient,
+      addPatient,
+      selectPatient,
+      departments,
+      admissionLogs,
+      incrementOccupied,
+      decrementOccupied,
+      getDepartmentStats,
+      getForecastHours
+    }}>
       {children}
     </PatientContext.Provider>
   );
