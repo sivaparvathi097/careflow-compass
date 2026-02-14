@@ -1,6 +1,4 @@
-- FastAPI
-- XGBoost
-- scikit-learn
-- Pandas
-- joblib
-- And supporting libraries
+fastapi
+uvicorn
+pydantic
+python-multipart
